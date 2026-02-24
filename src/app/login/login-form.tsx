@@ -17,10 +17,17 @@ import {
 export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const errorParam = searchParams.get("error");
+  const initialError =
+    errorParam === "admin_only"
+      ? "Admin access required. Non-admin users connect through Claude's MCP integration."
+      : null;
+
+  const [error, setError] = useState<string | null>(initialError);
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +35,11 @@ export function LoginForm() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
     if (authError) {
       setError(authError.message);
@@ -39,13 +47,33 @@ export function LoginForm() {
       return;
     }
 
-    // Redirect to returnTo if present (used by OAuth flow), otherwise admin dashboard
+    // If there's a returnTo (OAuth consent flow), redirect there regardless of role
     const returnTo = searchParams.get("returnTo");
     if (returnTo) {
       router.push(returnTo);
-    } else {
-      router.push("/admin");
+      return;
     }
+
+    // Otherwise check role — only admins can access the admin dashboard
+    const userId = authData.user?.id;
+    if (userId) {
+      const { data: profile } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      if (!profile || profile.role !== "admin") {
+        setError(
+          "You signed in successfully, but only admins can access the dashboard. " +
+            "Non-admin users connect through Claude's MCP integration."
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
+    router.push("/admin");
   };
 
   return (

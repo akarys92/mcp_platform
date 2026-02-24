@@ -24,7 +24,7 @@ export default async function AdminLayout({
     .single();
 
   if (!userData || userData.role !== "admin") {
-    redirect("/login");
+    redirect("/login?error=admin_only");
   }
 
   return (
