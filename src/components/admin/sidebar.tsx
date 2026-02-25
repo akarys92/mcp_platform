@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin/users", label: "Users", icon: "●" },
   { href: "/admin/permissions", label: "Permissions", icon: "◈" },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: "☰" },
+  { href: "/admin/setup", label: "Setup Guide", icon: "?" },
 ];
 
 export function Sidebar() {

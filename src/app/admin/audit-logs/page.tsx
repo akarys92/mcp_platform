@@ -120,7 +120,7 @@ export default async function AuditLogsPage({
                       })}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {user?.name || user?.email || "System"}
+                      {user?.email || "System"}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs">

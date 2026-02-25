@@ -75,10 +75,12 @@ export async function updateUser(
 
   if (error) throw new Error(error.message);
 
+  const userEmail = await resolveUserEmail(admin, userId);
+
   await logAdminAction({
     userId: adminId,
     actionType: "user_updated",
-    actionDetail: `Updated user ${userId}: ${JSON.stringify(data)}`,
+    actionDetail: `Updated ${userEmail}: ${JSON.stringify(data)}`,
   });
 
   revalidatePath("/admin/users");
@@ -88,6 +90,9 @@ export async function deleteUser(userId: string) {
   const adminId = await requireAdmin();
   const admin = createAdminClient();
 
+  // Resolve email before deletion since the user row will be cascade-deleted
+  const userEmail = await resolveUserEmail(admin, userId);
+
   // Delete from auth (cascade will handle public.users)
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) throw new Error(error.message);
@@ -95,7 +100,7 @@ export async function deleteUser(userId: string) {
   await logAdminAction({
     userId: adminId,
     actionType: "user_deleted",
-    actionDetail: `Deleted user ${userId}`,
+    actionDetail: `Deleted ${userEmail}`,
   });
 
   revalidatePath("/admin/users");
@@ -116,10 +121,15 @@ export async function grantPermission(userId: string, toolId: string) {
 
   if (error) throw new Error(error.message);
 
+  const [toolName, userEmail] = await Promise.all([
+    resolveToolName(admin, toolId),
+    resolveUserEmail(admin, userId),
+  ]);
+
   await logAdminAction({
     userId: adminId,
     actionType: "permission_granted",
-    actionDetail: `Granted tool ${toolId} to user ${userId}`,
+    actionDetail: `Granted ${toolName} to ${userEmail}`,
   });
 
   revalidatePath("/admin/permissions");
@@ -137,10 +147,15 @@ export async function revokePermission(userId: string, toolId: string) {
 
   if (error) throw new Error(error.message);
 
+  const [toolName, userEmail] = await Promise.all([
+    resolveToolName(admin, toolId),
+    resolveUserEmail(admin, userId),
+  ]);
+
   await logAdminAction({
     userId: adminId,
     actionType: "permission_revoked",
-    actionDetail: `Revoked tool ${toolId} from user ${userId}`,
+    actionDetail: `Revoked ${toolName} from ${userEmail}`,
   });
 
   revalidatePath("/admin/permissions");
@@ -173,10 +188,12 @@ export async function grantCategoryPermissions(
 
   if (error) throw new Error(error.message);
 
+  const userEmail = await resolveUserEmail(admin, userId);
+
   await logAdminAction({
     userId: adminId,
     actionType: "permission_bulk_granted",
-    actionDetail: `Granted all ${category} tools to user ${userId}`,
+    actionDetail: `Granted all ${category} tools to ${userEmail}`,
   });
 
   revalidatePath("/admin/permissions");
@@ -193,10 +210,12 @@ export async function revokeAllPermissions(userId: string) {
 
   if (error) throw new Error(error.message);
 
+  const userEmail = await resolveUserEmail(admin, userId);
+
   await logAdminAction({
     userId: adminId,
     actionType: "permission_bulk_revoked",
-    actionDetail: `Revoked all tools from user ${userId}`,
+    actionDetail: `Revoked all tools from ${userEmail}`,
   });
 
   revalidatePath("/admin/permissions");
@@ -213,10 +232,12 @@ export async function toggleTool(toolId: string, isActive: boolean) {
 
   if (error) throw new Error(error.message);
 
+  const toolName = await resolveToolName(admin, toolId);
+
   await logAdminAction({
     userId: adminId,
     actionType: "tool_toggled",
-    actionDetail: `${isActive ? "Enabled" : "Disabled"} tool ${toolId}`,
+    actionDetail: `${isActive ? "Enabled" : "Disabled"} ${toolName}`,
   });
 
   revalidatePath("/admin/connectors");
@@ -237,10 +258,12 @@ export async function disconnectConnector(connectorId: string) {
 
   if (error) throw new Error(error.message);
 
+  const connectorName = await resolveConnectorName(admin, connectorId);
+
   await logAdminAction({
     userId: adminId,
     actionType: "connector_disconnected",
-    actionDetail: `Disconnected connector ${connectorId}`,
+    actionDetail: `Disconnected ${connectorName}`,
     connectorId,
   });
 
@@ -259,11 +282,44 @@ export async function revokeUserToken(userId: string) {
 
   if (error) throw new Error(error.message);
 
+  const userEmail = await resolveUserEmail(admin, userId);
+
   await logAdminAction({
     userId: adminId,
     actionType: "token_revoked",
-    actionDetail: `Revoked MCP tokens for user ${userId}`,
+    actionDetail: `Revoked MCP tokens for ${userEmail}`,
   });
 
   revalidatePath("/admin/users");
+}
+
+// ── Helpers to resolve UUIDs to human-readable names for audit logs ──
+
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+async function resolveUserEmail(admin: AdminClient, userId: string): Promise<string> {
+  const { data } = await admin
+    .from("users")
+    .select("email")
+    .eq("id", userId)
+    .single();
+  return data?.email || userId;
+}
+
+async function resolveToolName(admin: AdminClient, toolId: string): Promise<string> {
+  const { data } = await admin
+    .from("tools")
+    .select("name")
+    .eq("id", toolId)
+    .single();
+  return data?.name || toolId;
+}
+
+async function resolveConnectorName(admin: AdminClient, connectorId: string): Promise<string> {
+  const { data } = await admin
+    .from("connectors")
+    .select("display_name")
+    .eq("id", connectorId)
+    .single();
+  return data?.display_name || connectorId;
 }

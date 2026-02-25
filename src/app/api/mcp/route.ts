@@ -7,58 +7,53 @@ import type { JsonRpcRequest, JsonRpcNotification } from "@/types/mcp";
 
 /**
  * MCP Streamable HTTP endpoint.
- * Single endpoint handling all MCP protocol traffic from Claude.
+ * All requests require a valid Bearer token. When the token is missing or
+ * invalid the server returns 401 with a WWW-Authenticate header pointing
+ * to the protected-resource metadata. This is what triggers Claude's OAuth
+ * authorization flow (per MCP spec / RFC 9728).
  */
 export async function POST(request: NextRequest) {
-  // Special case: initialize doesn't require auth (Claude hasn't completed
-  // the OAuth flow yet when it first connects). However, tools/list and
-  // tools/call do require auth.
+  const proto = request.headers.get("x-forwarded-proto") || "https";
+  const host = request.headers.get("host") || "localhost:3000";
+  const baseUrl = `${proto}://${host}`;
+
+  // ── Auth check (applies to ALL methods including initialize) ───────
+  const auth = await validateMCPToken(
+    request.headers.get("authorization")
+  );
+
+  if (!auth.valid) {
+    console.log(
+      `[MCP] 401 — no valid token (auth header present: ${request.headers.has("authorization")})`
+    );
+    return new NextResponse(null, {
+      status: 401,
+      headers: {
+        "WWW-Authenticate": wwwAuthenticateHeader(baseUrl),
+      },
+    });
+  }
+
+  const userId = auth.userId!;
+
+  // ── Parse JSON-RPC body ────────────────────────────────────────────
   const body = await request.json();
   const message = body as JsonRpcRequest | JsonRpcNotification;
 
-  // Allow initialize without auth — Claude needs to discover the server
-  // before completing OAuth. For all other methods, require Bearer token.
-  const isInitialize =
-    message.method === "initialize" ||
-    message.method === "notifications/initialized";
+  const rpcId = "id" in message ? (message as JsonRpcRequest).id : null;
+  console.log(`[MCP] method=${message.method} id=${rpcId} user=${userId}`);
 
-  let userId: string | undefined;
-
-  if (!isInitialize) {
-    const auth = await validateMCPToken(
-      request.headers.get("authorization")
+  // ── Rate limit ─────────────────────────────────────────────────────
+  if (!checkUserRateLimit(userId)) {
+    return NextResponse.json(
+      { jsonrpc: "2.0", id: rpcId, error: rateLimitError() },
+      { status: 429 }
     );
-
-    if (!auth.valid) {
-      return new NextResponse(null, {
-        status: 401,
-        headers: {
-          "WWW-Authenticate": wwwAuthenticateHeader(
-            process.env.NEXT_PUBLIC_APP_URL!
-          ),
-        },
-      });
-    }
-    userId = auth.userId;
-
-    // Rate limit authenticated requests
-    if (userId && !checkUserRateLimit(userId)) {
-      const rpcId = "id" in message ? (message as JsonRpcRequest).id : null;
-      return NextResponse.json(
-        {
-          jsonrpc: "2.0",
-          id: rpcId,
-          error: rateLimitError(),
-        },
-        { status: 429 }
-      );
-    }
   }
 
-  // Route to handler
+  // ── Route to handler ──────────────────────────────────────────────
   const result = await handleMCPMessage(message, userId);
 
-  // Extract session ID if set by initialize handler
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -71,16 +66,32 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET: Server-initiated messages.
- * Not needed for MVP — Claude doesn't use this.
+ * GET: Server-Sent Events stream (not used in MVP).
+ * Return 401 so Claude discovers the OAuth flow.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await validateMCPToken(
+    request.headers.get("authorization")
+  );
+
+  if (!auth.valid) {
+    const proto = request.headers.get("x-forwarded-proto") || "https";
+    const host = request.headers.get("host") || "localhost:3000";
+    const baseUrl = `${proto}://${host}`;
+
+    return new NextResponse(null, {
+      status: 401,
+      headers: {
+        "WWW-Authenticate": wwwAuthenticateHeader(baseUrl),
+      },
+    });
+  }
+
   return new NextResponse(null, { status: 405 });
 }
 
 /**
- * DELETE: Session termination.
- * Accept gracefully.
+ * DELETE: Session termination. Accept gracefully.
  */
 export async function DELETE() {
   return new NextResponse(null, { status: 200 });

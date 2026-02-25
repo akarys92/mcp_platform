@@ -142,7 +142,7 @@ export default async function AdminDashboard() {
                       </p>
                     </div>
                     <div className="shrink-0 text-right text-xs text-muted-foreground">
-                      <p>{user?.name || user?.email || "System"}</p>
+                      <p>{user?.email || "System"}</p>
                       <p>
                         {new Date(log.created_at).toLocaleDateString("en-US", {
                           month: "short",

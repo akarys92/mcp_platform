@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { encrypt } from "@/lib/crypto";
 import { getToolSeedData } from "@/lib/qbo/tool-definitions";
 import { logAdminAction } from "@/lib/mcp/audit";
+import { autoGrantReadTools } from "@/lib/mcp/auto-grant";
 
 /**
  * QuickBooks OAuth callback.
@@ -154,6 +155,9 @@ export async function GET(request: NextRequest) {
   if (toolError) {
     console.error("Failed to seed tools:", toolError);
   }
+
+  // Auto-grant read tools to all users
+  await autoGrantReadTools(connectorId, user.id);
 
   // Audit log
   await logAdminAction({
