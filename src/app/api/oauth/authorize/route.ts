@@ -24,9 +24,13 @@ export async function POST(request: NextRequest) {
     scope,
   } = body;
 
-  // Validate client_id
-  if (client_id !== process.env.MCP_CLIENT_ID) {
-    return NextResponse.json({ error: "invalid_client" }, { status: 400 });
+  // Accept any client_id — Claude Desktop and claude.ai use their own IDs.
+  // The client_id is stored with the auth code and validated during token exchange.
+  if (!client_id) {
+    return NextResponse.json(
+      { error: "invalid_request", error_description: "Missing client_id" },
+      { status: 400 }
+    );
   }
 
   // Generate authorization code (32 random bytes, hex encoded)

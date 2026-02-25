@@ -8,18 +8,18 @@ type ToolHandler = (
 ) => Promise<unknown>;
 
 const TOOL_MAP: Record<string, ToolHandler> = {
-  get_invoices: readTools.getInvoices,
-  get_invoice_detail: readTools.getInvoiceDetail,
-  get_customers: readTools.getCustomers,
-  get_payments: readTools.getPayments,
-  get_bills: readTools.getBills,
-  get_profit_loss: readTools.getProfitLoss,
-  get_balance_sheet: readTools.getBalanceSheet,
-  get_accounts_receivable: readTools.getAccountsReceivable,
-  create_invoice: writeTools.createInvoice,
-  send_invoice: writeTools.sendInvoice,
-  record_payment: writeTools.recordPayment,
-  create_customer: writeTools.createCustomer,
+  qb_get_invoices: readTools.getInvoices,
+  qb_get_invoice_detail: readTools.getInvoiceDetail,
+  qb_get_customers: readTools.getCustomers,
+  qb_get_payments: readTools.getPayments,
+  qb_get_bills: readTools.getBills,
+  qb_get_profit_loss: readTools.getProfitLoss,
+  qb_get_balance_sheet: readTools.getBalanceSheet,
+  qb_get_accounts_receivable: readTools.getAccountsReceivable,
+  qb_create_invoice: writeTools.createInvoice,
+  qb_send_invoice: writeTools.sendInvoice,
+  qb_record_payment: writeTools.recordPayment,
+  qb_create_customer: writeTools.createCustomer,
 };
 
 /**

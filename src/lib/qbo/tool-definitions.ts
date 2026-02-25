@@ -18,7 +18,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   // ── Read Tools ──────────────────────────────────────────────────────
 
   {
-    name: "get_invoices",
+    name: "qb_get_invoices",
     display_name: "List Invoices",
     description:
       "Query invoices with optional filters for date range, customer, and status (paid, unpaid, overdue). Returns a summary list.",
@@ -53,7 +53,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "get_invoice_detail",
+    name: "qb_get_invoice_detail",
     display_name: "Invoice Detail",
     description:
       "Get full details for a specific invoice including line items, amounts, payment status, and customer info.",
@@ -71,7 +71,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "get_customers",
+    name: "qb_get_customers",
     display_name: "List Customers",
     description:
       "List all customers/clients with contact info and outstanding balances. Supports name search.",
@@ -96,7 +96,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "get_payments",
+    name: "qb_get_payments",
     display_name: "List Payments",
     description:
       "List payments received, filterable by date range and customer.",
@@ -125,7 +125,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "get_bills",
+    name: "qb_get_bills",
     display_name: "List Bills",
     description:
       "List vendor bills and their payment status. Status is derived from the balance: paid (balance = 0), unpaid (balance = total), or partially paid.",
@@ -158,7 +158,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "get_profit_loss",
+    name: "qb_get_profit_loss",
     display_name: "Profit & Loss Report",
     description:
       "Generate a Profit & Loss (income statement) report for a date range. Can optionally break down by month or quarter.",
@@ -186,7 +186,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "get_balance_sheet",
+    name: "qb_get_balance_sheet",
     display_name: "Balance Sheet",
     description:
       "Generate a Balance Sheet report showing assets, liabilities, and equity as of a given date.",
@@ -209,7 +209,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "get_accounts_receivable",
+    name: "qb_get_accounts_receivable",
     display_name: "Accounts Receivable Aging",
     description:
       "Show an A/R aging summary: who owes what and how overdue. Breaks down by aging buckets (Current, 1-30, 31-60, 61-90, 91+ days).",
@@ -229,7 +229,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   // ── Write Tools ─────────────────────────────────────────────────────
 
   {
-    name: "create_invoice",
+    name: "qb_create_invoice",
     display_name: "Create Invoice",
     description:
       "Create a new invoice for a customer with line items, amounts, and due date. Requires existing customer and item IDs from QuickBooks.",
@@ -289,7 +289,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "send_invoice",
+    name: "qb_send_invoice",
     display_name: "Send Invoice",
     description:
       "Email an existing invoice to the customer. The invoice must have a billing email set, or you can override with a specific email address.",
@@ -312,7 +312,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "record_payment",
+    name: "qb_record_payment",
     display_name: "Record Payment",
     description:
       "Record a payment received against one or more outstanding invoices.",
@@ -353,7 +353,7 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: "create_customer",
+    name: "qb_create_customer",
     display_name: "Create Customer",
     description:
       "Add a new customer/client record in QuickBooks. Display name must be unique across all customers, vendors, and employees.",

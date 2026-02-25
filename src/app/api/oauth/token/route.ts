@@ -11,8 +11,38 @@ const TOKEN_EXPIRY_DAYS = 90;
  * Request body: application/x-www-form-urlencoded (NOT JSON)
  */
 export async function POST(request: NextRequest) {
-  const formData = await request.formData();
-  const grantType = formData.get("grant_type") as string;
+  const contentType = request.headers.get("content-type") || "";
+  console.log(`[OAuth Token] content-type: ${contentType}`);
+
+  let grantType: string | null = null;
+  let formData: FormData;
+
+  try {
+    formData = await request.formData();
+    grantType = formData.get("grant_type") as string;
+  } catch {
+    // Claude may send JSON instead of form data
+    console.log("[OAuth Token] Failed to parse as form data, trying JSON");
+    try {
+      const cloned = request.clone();
+      const jsonBody = await cloned.json();
+      console.log("[OAuth Token] JSON body:", JSON.stringify(jsonBody));
+      grantType = jsonBody.grant_type;
+      // Convert JSON body to FormData for downstream handlers
+      formData = new FormData();
+      for (const [key, value] of Object.entries(jsonBody)) {
+        if (typeof value === "string") formData.set(key, value);
+      }
+    } catch {
+      console.log("[OAuth Token] Failed to parse body entirely");
+      return NextResponse.json(
+        { error: "invalid_request", error_description: "Could not parse request body" },
+        { status: 400 }
+      );
+    }
+  }
+
+  console.log(`[OAuth Token] grant_type=${grantType}`);
 
   if (grantType === "authorization_code") {
     return handleAuthorizationCode(formData);
@@ -21,7 +51,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { error: "unsupported_grant_type" },
+    { error: "unsupported_grant_type", error_description: `grant_type "${grantType}" is not supported` },
     { status: 400 }
   );
 }

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { executeQBOTool } from "@/lib/qbo/executor";
+import { executeDemoTool } from "@/lib/demo/executor";
 import { logToolCall } from "@/lib/mcp/audit";
 import { validateToolArgs } from "@/lib/qbo/validation";
 import {
@@ -16,9 +17,9 @@ import type { JsonRpcResponse, MCPToolCallParams } from "@/types/mcp";
 import { JSON_RPC_ERRORS } from "@/types/mcp";
 
 const REPORT_TOOLS = new Set([
-  "get_profit_loss",
-  "get_balance_sheet",
-  "get_accounts_receivable",
+  "qb_get_profit_loss",
+  "qb_get_balance_sheet",
+  "qb_get_accounts_receivable",
 ]);
 
 /**
@@ -45,14 +46,18 @@ export async function handleToolCall(
     };
   }
 
-  // Check user has permission for this tool
+  // Check user has permission for this tool (join connector to get type)
   const { data: tools, error: toolError } = await supabase
     .from("tools")
-    .select("id, connector_id, is_active, input_schema")
+    .select("id, connector_id, is_active, input_schema, connectors(type)")
     .eq("name", toolName)
     .limit(1);
 
   const tool = tools?.[0];
+  const connectorType = (tool?.connectors as unknown as { type: string } | { type: string }[] | null);
+  const connectorTypeStr = Array.isArray(connectorType)
+    ? connectorType[0]?.type
+    : connectorType?.type;
 
   if (toolError || !tool) {
     return { jsonrpc: "2.0", id, error: toolNotFoundError(toolName) };
@@ -101,23 +106,32 @@ export async function handleToolCall(
     }
   }
 
-  // Check QBO rate limits
-  const isReport = REPORT_TOOLS.has(toolName);
-  const withinLimit = isReport
-    ? checkQBOReportRateLimit()
-    : checkQBOStandardRateLimit();
+  // Check QBO rate limits (only for QBO tools)
+  if (connectorTypeStr === "quickbooks") {
+    const isReport = REPORT_TOOLS.has(toolName);
+    const withinLimit = isReport
+      ? checkQBOReportRateLimit()
+      : checkQBOStandardRateLimit();
 
-  if (!withinLimit) {
-    return { jsonrpc: "2.0", id, error: rateLimitError() };
+    if (!withinLimit) {
+      return { jsonrpc: "2.0", id, error: rateLimitError() };
+    }
   }
 
-  // Execute the tool
+  // Execute the tool — route to the right executor by connector type
   try {
-    const result = await executeQBOTool(
-      toolName,
-      toolArgs || {},
-      tool.connector_id
-    );
+    let result: unknown;
+    if (connectorTypeStr === "stardex") {
+      // Demo connector — runs in-process, no external API
+      result = executeDemoTool(toolName, toolArgs || {});
+    } else {
+      // QBO connector (default)
+      result = await executeQBOTool(
+        toolName,
+        toolArgs || {},
+        tool.connector_id
+      );
+    }
 
     const durationMs = Date.now() - startTime;
 

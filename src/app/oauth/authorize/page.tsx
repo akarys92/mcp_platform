@@ -68,18 +68,8 @@ export default async function AuthorizePage({
     );
   }
 
-  if (client_id !== process.env.MCP_CLIENT_ID) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="text-center">
-          <h1 className="text-xl font-semibold">Unknown Client</h1>
-          <p className="mt-2 text-muted-foreground">
-            The client_id is not registered with this server.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Accept any client_id — Claude Desktop and claude.ai use their own IDs.
+  // In production you could maintain an allowlist if needed.
 
   // Check if user is authenticated
   const supabase = await createClient();
@@ -88,14 +78,13 @@ export default async function AuthorizePage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    // Build the full authorize URL to return to after login
-    const authorizeUrl = new URL("/oauth/authorize", process.env.NEXT_PUBLIC_APP_URL!);
+    // Build the returnTo path (relative — works with any host/tunnel)
+    const authorizeParams = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
-      if (value) authorizeUrl.searchParams.set(key, value);
+      if (value) authorizeParams.set(key, value);
     }
-    const loginUrl = new URL("/login", process.env.NEXT_PUBLIC_APP_URL!);
-    loginUrl.searchParams.set("returnTo", authorizeUrl.pathname + authorizeUrl.search);
-    redirect(loginUrl.toString());
+    const returnTo = `/oauth/authorize?${authorizeParams.toString()}`;
+    redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
   // Get user name from our users table
