@@ -37,5 +37,28 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Force password change for new users
+  if (user) {
+    const pathname = request.nextUrl.pathname;
+    const skipForceChange =
+      pathname.startsWith("/change-password") ||
+      pathname.startsWith("/login") ||
+      pathname.startsWith("/api/");
+
+    if (!skipForceChange) {
+      const { data: profile } = await supabase
+        .from("users")
+        .select("must_change_password")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.must_change_password) {
+        return NextResponse.redirect(
+          new URL("/change-password", request.url)
+        );
+      }
+    }
+  }
+
   return supabaseResponse;
 }

@@ -11,16 +11,19 @@ export default async function Home() {
     redirect("/login");
   }
 
-  // Check if admin — if so, send to dashboard; otherwise back to login with message
   const { data: profile } = await supabase
     .from("users")
-    .select("role")
+    .select("role, must_change_password")
     .eq("id", user.id)
     .single();
+
+  if (profile?.must_change_password) {
+    redirect("/change-password");
+  }
 
   if (profile?.role === "admin") {
     redirect("/admin");
   }
 
-  redirect("/login?error=admin_only");
+  redirect("/setup-claude");
 }
