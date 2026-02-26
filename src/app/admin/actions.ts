@@ -48,6 +48,7 @@ export async function createUser(formData: FormData) {
     email,
     name,
     role,
+    must_change_password: true,
   });
 
   if (insertError) throw new Error(insertError.message);
@@ -290,6 +291,38 @@ export async function revokeUserToken(userId: string) {
     actionDetail: `Revoked MCP tokens for ${userEmail}`,
   });
 
+  revalidatePath("/admin/users");
+}
+
+export async function resetUserPassword(userId: string, newPassword: string) {
+  const adminId = await requireAdmin();
+  const admin = createAdminClient();
+
+  if (!newPassword || newPassword.length < 8) {
+    throw new Error("Password must be at least 8 characters");
+  }
+
+  // Update auth password via admin API
+  const { error: authError } = await admin.auth.admin.updateUserById(userId, {
+    password: newPassword,
+  });
+  if (authError) throw new Error(authError.message);
+
+  // Re-set the must_change_password flag
+  const { error: flagError } = await admin
+    .from("users")
+    .update({ must_change_password: true })
+    .eq("id", userId);
+  if (flagError) throw new Error(flagError.message);
+
+  const userEmail = await resolveUserEmail(admin, userId);
+  await logAdminAction({
+    userId: adminId,
+    actionType: "password_reset",
+    actionDetail: `Reset password for ${userEmail}`,
+  });
+
+  revalidatePath(`/admin/users/${userId}`);
   revalidatePath("/admin/users");
 }
 

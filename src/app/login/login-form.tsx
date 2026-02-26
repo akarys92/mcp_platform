@@ -47,33 +47,38 @@ export function LoginForm() {
       return;
     }
 
-    // If there's a returnTo (OAuth consent flow), redirect there regardless of role
-    const returnTo = searchParams.get("returnTo");
-    if (returnTo) {
-      router.push(returnTo);
-      return;
-    }
-
-    // Otherwise check role — only admins can access the admin dashboard
+    // Check profile for role and password-change flag
     const userId = authData.user?.id;
     if (userId) {
       const { data: profile } = await supabase
         .from("users")
-        .select("role")
+        .select("role, must_change_password")
         .eq("id", userId)
         .single();
 
-      if (!profile || profile.role !== "admin") {
-        setError(
-          "You signed in successfully, but only admins can access the dashboard. " +
-            "Non-admin users connect through Claude's MCP integration."
-        );
-        setLoading(false);
+      // Force password change before anything else
+      if (profile?.must_change_password) {
+        router.push("/change-password");
         return;
       }
+
+      // If there's a returnTo (OAuth consent flow), redirect there regardless of role
+      const returnTo = searchParams.get("returnTo");
+      if (returnTo) {
+        router.push(returnTo);
+        return;
+      }
+
+      // Route based on role
+      if (profile?.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/setup-claude");
+      }
+      return;
     }
 
-    router.push("/admin");
+    router.push("/");
   };
 
   return (

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/admin/sidebar";
+import { UserMenu } from "@/components/admin/user-menu";
 
 export default async function AdminLayout({
   children,
@@ -33,19 +34,7 @@ export default async function AdminLayout({
       <main className="flex-1 overflow-auto">
         <header className="flex items-center justify-between border-b px-6 py-3">
           <div />
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-muted-foreground">
-              {userData.name || userData.email}
-            </span>
-            <form action="/api/auth/signout" method="POST">
-              <button
-                type="submit"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
+          <UserMenu displayName={userData.name || userData.email} />
         </header>
         <div className="p-6">{children}</div>
       </main>
