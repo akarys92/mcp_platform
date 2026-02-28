@@ -35,10 +35,10 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-lg font-semibold">1. Introduction</h2>
               <p className="text-muted-foreground">
                 Einstellen Connect (&quot;we&quot;, &quot;our&quot;, or
-                &quot;us&quot;) provides an MCP (Model Context Protocol) server
-                that connects Claude AI to your organization&apos;s business
-                tools. This Privacy Policy describes how we collect, use, and
-                protect your information when you use our platform.
+                &quot;us&quot;) provides an internal business platform for
+                authorized personnel. This Privacy Policy describes how we
+                collect, use, and protect your information when you use our
+                services.
               </p>
             </section>
 
@@ -49,28 +49,19 @@ export default function PrivacyPolicyPage() {
               <h3 className="font-medium">Account Information</h3>
               <ul className="list-disc space-y-1 pl-6 text-muted-foreground">
                 <li>Email address</li>
-                <li>Hashed password credentials</li>
-                <li>User role and permissions</li>
+                <li>Authentication credentials</li>
+                <li>Access level and permissions</li>
               </ul>
               <h3 className="font-medium">Usage Data</h3>
               <ul className="list-disc space-y-1 pl-6 text-muted-foreground">
-                <li>
-                  Audit logs of tool invocations (which tools were called, when,
-                  and by whom)
-                </li>
-                <li>OAuth authorization events</li>
+                <li>System activity logs for security and compliance</li>
                 <li>Authentication events (sign-in, sign-out, password changes)</li>
               </ul>
-              <h3 className="font-medium">Business Tool Data</h3>
+              <h3 className="font-medium">Operational Data</h3>
               <ul className="list-disc space-y-1 pl-6 text-muted-foreground">
                 <li>
-                  Data retrieved from connected third-party services (e.g.
-                  QuickBooks, Google Drive, DocuSign) is passed through our
-                  server to Claude AI on your behalf
-                </li>
-                <li>
-                  OAuth tokens for connected services are stored securely to
-                  maintain your sessions
+                  Data necessary to support internal business operations and
+                  authorized workflows
                 </li>
               </ul>
             </section>
@@ -81,18 +72,10 @@ export default function PrivacyPolicyPage() {
               </h2>
               <p className="text-muted-foreground">We use your information to:</p>
               <ul className="list-disc space-y-1 pl-6 text-muted-foreground">
-                <li>Authenticate you and manage access to the platform</li>
-                <li>
-                  Route requests between Claude AI and your connected business
-                  tools
-                </li>
-                <li>
-                  Enforce permission controls set by your organization&apos;s
-                  administrator
-                </li>
-                <li>
-                  Maintain audit logs for security and compliance purposes
-                </li>
+                <li>Authenticate you and manage access</li>
+                <li>Provide and improve internal services</li>
+                <li>Enforce permissions set by your organization</li>
+                <li>Maintain security and compliance records</li>
                 <li>Diagnose and resolve technical issues</li>
               </ul>
             </section>
@@ -101,17 +84,12 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-lg font-semibold">4. Data Storage and Security</h2>
               <ul className="list-disc space-y-1 pl-6 text-muted-foreground">
                 <li>
-                  User data is stored in Supabase with row-level security
-                  policies
+                  User data is stored in secure, access-controlled systems
                 </li>
-                <li>Passwords are hashed and never stored in plaintext</li>
+                <li>Credentials are protected using industry-standard methods</li>
                 <li>
-                  All communication between your browser, our server, and
-                  third-party services uses TLS encryption
-                </li>
-                <li>
-                  OAuth tokens for third-party services are stored encrypted at
-                  rest
+                  All communication between your browser and our systems uses
+                  TLS encryption
                 </li>
                 <li>
                   Access to data is restricted based on your
@@ -123,27 +101,11 @@ export default function PrivacyPolicyPage() {
             <section className="space-y-2">
               <h2 className="text-lg font-semibold">5. Third-Party Services</h2>
               <p className="text-muted-foreground">
-                Einstellen Connect integrates with third-party services on your
-                behalf. When you connect a service, data flows between that
-                service and Claude AI through our platform. Each third-party
-                service is governed by its own privacy policy and terms. We
-                encourage you to review those policies.
+                We may rely on third-party service providers to support
+                infrastructure, security, and operational needs. These providers
+                process data on our behalf under contractual safeguards. Each
+                provider is governed by its own privacy policy and terms.
               </p>
-              <p className="text-muted-foreground">
-                We use the following infrastructure providers:
-              </p>
-              <ul className="list-disc space-y-1 pl-6 text-muted-foreground">
-                <li>
-                  <strong>Supabase</strong> &mdash; authentication and database
-                </li>
-                <li>
-                  <strong>Vercel</strong> &mdash; application hosting
-                </li>
-                <li>
-                  <strong>Anthropic</strong> &mdash; Claude AI (via MCP
-                  protocol)
-                </li>
-              </ul>
             </section>
 
             <section className="space-y-2">

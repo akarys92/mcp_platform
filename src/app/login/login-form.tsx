@@ -125,7 +125,7 @@ export function LoginForm() {
           </form>
         </CardContent>
       </Card>
-      <div className="mt-4 flex justify-center gap-3 text-xs text-muted-foreground">
+      <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-3 text-xs text-muted-foreground">
         <Link href="/privacy" className="underline hover:text-foreground">
           Privacy Policy
         </Link>
