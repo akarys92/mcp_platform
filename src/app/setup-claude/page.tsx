@@ -27,7 +27,7 @@ export default async function SetupClaudePage() {
 
   if (profile?.must_change_password) redirect("/change-password");
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
   const mcpUrl = `${appUrl}/api/mcp`;
   const isAdmin = profile?.role === "admin";
 

@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { CopyBlock } from "@/components/admin/copy-block";
 
 export default function SetupGuidePage() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
   const mcpClientId = process.env.MCP_CLIENT_ID || "einstellen-claude-connector";
   const mcpUrl = `${appUrl}/api/mcp`;
 
