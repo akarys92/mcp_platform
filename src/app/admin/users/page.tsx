@@ -52,15 +52,22 @@ export default async function UsersPage() {
               {(users ?? []).map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-mono text-xs">
-                    {user.email}
+                    {user.user_type === "agent"
+                      ? user.name || "Agent"
+                      : user.email}
                   </TableCell>
                   <TableCell>{user.name || "—"}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant={user.role === "admin" ? "default" : "secondary"}
-                    >
-                      {user.role}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge
+                        variant={user.role === "admin" ? "default" : "secondary"}
+                      >
+                        {user.role}
+                      </Badge>
+                      {user.user_type === "agent" && (
+                        <Badge variant="outline">Agent</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(user.created_at).toLocaleDateString()}

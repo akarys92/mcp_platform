@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ToolToggle } from "@/components/admin/tool-toggle";
 import { DisconnectButton } from "@/components/admin/disconnect-button";
+import { ApiKeyConnectForm } from "@/components/admin/api-key-connect-form";
+import { ConnectedKeyDisplay } from "@/components/admin/connected-key-display";
 
 type ToolRow = {
   id: string;
@@ -84,75 +86,122 @@ export default async function ConnectorsPage() {
 
   const qboConnector =
     connectors?.find((c) => c.type === "quickbooks") ?? null;
-  const demoConnector =
+  const stardexConnector =
     connectors?.find((c) => c.type === "stardex") ?? null;
+  const apolloConnector =
+    connectors?.find((c) => c.type === "apollo") ?? null;
 
   // Fetch tools for each connected connector
   const qboTools = qboConnector
     ? await getToolsForConnector(admin, qboConnector.id)
     : [];
-  const demoTools = demoConnector
-    ? await getToolsForConnector(admin, demoConnector.id)
+  const stardexTools = stardexConnector
+    ? await getToolsForConnector(admin, stardexConnector.id)
+    : [];
+  const apolloTools = apolloConnector
+    ? await getToolsForConnector(admin, apolloConnector.id)
     : [];
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-semibold tracking-tight">Connectors</h2>
 
-      {/* Demo Tools card */}
+      {/* Stardex card */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Demo Tools</CardTitle>
+              <CardTitle>Stardex</CardTitle>
               <CardDescription>
-                Magic 8-Ball, dice roller, coin flip, and excuse generator —
-                no external APIs required
+                ATS &amp; Recruiting — jobs, candidates, persons, and activities
               </CardDescription>
             </div>
-            {demoConnector && (
+            {stardexConnector && (
               <Badge
                 variant={
                   statusColor[
-                    demoConnector.status as keyof typeof statusColor
+                    stardexConnector.status as keyof typeof statusColor
                   ] ?? "secondary"
                 }
               >
-                {demoConnector.status}
+                {stardexConnector.status}
               </Badge>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!demoConnector || demoConnector.status === "disconnected" ? (
+          {!stardexConnector || stardexConnector.status === "disconnected" ? (
             <div>
               <p className="mb-3 text-sm text-muted-foreground">
-                Enable demo tools to test the MCP pipeline and permission
-                system without connecting any external service.
+                Connect your Stardex account to enable recruiting tools for
+                Claude.
               </p>
-              <a href="/api/demo/connect">
-                <Button>Enable Demo Tools</Button>
-              </a>
+              <ApiKeyConnectForm
+                connectorType="stardex"
+                endpoint="/api/stardex/connect"
+              />
             </div>
           ) : (
             <>
-              <div className="text-sm text-muted-foreground">
-                Connected{" "}
-                {demoConnector.connected_at
-                  ? new Date(demoConnector.connected_at).toLocaleDateString()
-                  : "—"}
-              </div>
+              <ConnectedKeyDisplay
+                connectorId={stardexConnector.id}
+                connectorType="stardex"
+                endpoint="/api/stardex/connect"
+                connectedAt={stardexConnector.connected_at}
+              />
 
-              <div className="flex gap-2">
-                <a href="/api/demo/connect">
-                  <Button variant="outline" size="sm">
-                    Re-sync Tools
-                  </Button>
-                </a>
-                <DisconnectButton connectorId={demoConnector.id} />
-              </div>
+              <ConnectorToolList tools={stardexTools} />
+            </>
+          )}
+        </CardContent>
+      </Card>
 
-              <ConnectorToolList tools={demoTools} />
+      {/* Apollo card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Apollo</CardTitle>
+              <CardDescription>
+                Sales intelligence — people search, enrichment, contacts, and
+                sequences
+              </CardDescription>
+            </div>
+            {apolloConnector && (
+              <Badge
+                variant={
+                  statusColor[
+                    apolloConnector.status as keyof typeof statusColor
+                  ] ?? "secondary"
+                }
+              >
+                {apolloConnector.status}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!apolloConnector || apolloConnector.status === "disconnected" ? (
+            <div>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Connect your Apollo account to enable sales intelligence tools
+                for Claude.
+              </p>
+              <ApiKeyConnectForm
+                connectorType="apollo"
+                endpoint="/api/apollo/connect"
+              />
+            </div>
+          ) : (
+            <>
+              <ConnectedKeyDisplay
+                connectorId={apolloConnector.id}
+                connectorType="apollo"
+                endpoint="/api/apollo/connect"
+                connectedAt={apolloConnector.connected_at}
+              />
+
+              <ConnectorToolList tools={apolloTools} />
             </>
           )}
         </CardContent>

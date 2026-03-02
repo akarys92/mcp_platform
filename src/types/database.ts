@@ -3,13 +3,14 @@ export interface User {
   email: string;
   name: string | null;
   role: "admin" | "user";
+  user_type: "employee" | "agent";
   created_at: string;
   updated_at: string;
 }
 
 export interface Connector {
   id: string;
-  type: "quickbooks" | "stardex" | "justworks" | "docusign" | "gdrive";
+  type: "quickbooks" | "stardex" | "apollo" | "justworks" | "docusign" | "gdrive";
   display_name: string;
   status: "connected" | "disconnected" | "error";
   oauth_credentials: string | null; // AES-256-GCM encrypted JSON
@@ -82,6 +83,16 @@ export interface OAuthAuthorizationCode {
   scopes: string[];
   expires_at: string;
   used: boolean;
+  created_at: string;
+}
+
+export interface AgentApiKey {
+  id: string;
+  user_id: string;
+  key_hash: string;
+  key_prefix: string;
+  label: string | null;
+  revoked_at: string | null;
   created_at: string;
 }
 

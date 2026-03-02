@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/mcp/audit";
+import { generateToken, hashToken } from "@/lib/crypto";
 import { revalidatePath } from "next/cache";
 
 async function requireAdmin() {
@@ -324,6 +325,127 @@ export async function resetUserPassword(userId: string, newPassword: string) {
 
   revalidatePath(`/admin/users/${userId}`);
   revalidatePath("/admin/users");
+}
+
+// ── Agent management ────────────────────────────────────────────────
+
+export async function createAgent(formData: FormData): Promise<string> {
+  const adminId = await requireAdmin();
+  const name = formData.get("name") as string;
+
+  const admin = createAdminClient();
+  const agentUuid = crypto.randomUUID();
+  const dummyEmail = `agent-${agentUuid}@agent.internal`;
+  const dummyPassword = generateToken(16);
+
+  // Create a Supabase auth user (satisfies FK constraint, agent never logs in)
+  const { data: authUser, error: authError } =
+    await admin.auth.admin.createUser({
+      email: dummyEmail,
+      password: dummyPassword,
+      email_confirm: true,
+    });
+
+  if (authError) throw new Error(authError.message);
+
+  // Insert into public.users as an agent
+  const { error: insertError } = await admin.from("users").insert({
+    id: authUser.user.id,
+    email: dummyEmail,
+    name,
+    role: "user",
+    user_type: "agent",
+    must_change_password: false,
+  });
+
+  if (insertError) throw new Error(insertError.message);
+
+  // Generate API key with eak_ prefix
+  const rawKey = generateToken(32);
+  const apiKey = `eak_${rawKey}`;
+  const keyHash = hashToken(apiKey);
+  const keyPrefix = apiKey.slice(0, 12);
+
+  const { error: keyError } = await admin.from("agent_api_keys").insert({
+    user_id: authUser.user.id,
+    key_hash: keyHash,
+    key_prefix: keyPrefix,
+    label: name,
+  });
+
+  if (keyError) throw new Error(keyError.message);
+
+  await logAdminAction({
+    userId: adminId,
+    actionType: "agent_created",
+    actionDetail: `Created agent "${name}"`,
+  });
+
+  revalidatePath("/admin/users");
+  return apiKey;
+}
+
+export async function revokeAgentKey(keyId: string) {
+  const adminId = await requireAdmin();
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from("agent_api_keys")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", keyId)
+    .is("revoked_at", null);
+
+  if (error) throw new Error(error.message);
+
+  await logAdminAction({
+    userId: adminId,
+    actionType: "agent_key_revoked",
+    actionDetail: `Revoked agent API key`,
+  });
+
+  revalidatePath("/admin/users");
+}
+
+export async function regenerateAgentKey(userId: string): Promise<string> {
+  const adminId = await requireAdmin();
+  const admin = createAdminClient();
+
+  // Revoke all existing keys for this agent
+  await admin
+    .from("agent_api_keys")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .is("revoked_at", null);
+
+  // Generate new key
+  const rawKey = generateToken(32);
+  const apiKey = `eak_${rawKey}`;
+  const keyHash = hashToken(apiKey);
+  const keyPrefix = apiKey.slice(0, 12);
+
+  const { data: user } = await admin
+    .from("users")
+    .select("name")
+    .eq("id", userId)
+    .single();
+
+  const { error: keyError } = await admin.from("agent_api_keys").insert({
+    user_id: userId,
+    key_hash: keyHash,
+    key_prefix: keyPrefix,
+    label: user?.name || "Agent",
+  });
+
+  if (keyError) throw new Error(keyError.message);
+
+  await logAdminAction({
+    userId: adminId,
+    actionType: "agent_key_regenerated",
+    actionDetail: `Regenerated API key for agent ${user?.name || userId}`,
+  });
+
+  revalidatePath("/admin/users");
+  return apiKey;
 }
 
 // ── Helpers to resolve UUIDs to human-readable names for audit logs ──
