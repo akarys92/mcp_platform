@@ -9,8 +9,8 @@ export interface TokenValidation {
 
 /**
  * Validate an MCP Bearer token from the Authorization header.
- * Looks up the token hash in the oauth_tokens table and verifies
- * it hasn't been revoked or expired.
+ * Supports both OAuth tokens (for Claude Desktop) and agent API keys
+ * (prefixed with "eak_" for OpenClaw agents).
  */
 export async function validateMCPToken(
   authHeader: string | null
@@ -27,6 +27,22 @@ export async function validateMCPToken(
   const tokenHash = hashToken(token);
   const supabase = createAdminClient();
 
+  // Fast path: agent API keys are prefixed with "eak_"
+  if (token.startsWith("eak_")) {
+    const { data } = await supabase
+      .from("agent_api_keys")
+      .select("user_id")
+      .eq("key_hash", tokenHash)
+      .is("revoked_at", null)
+      .single();
+
+    if (data) {
+      return { valid: true, userId: data.user_id };
+    }
+    return { valid: false, error: "Invalid agent key" };
+  }
+
+  // OAuth token path (existing behavior)
   const { data, error } = await supabase
     .from("oauth_tokens")
     .select("user_id, expires_at, revoked_at")

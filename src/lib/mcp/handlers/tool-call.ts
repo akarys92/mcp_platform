@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { executeQBOTool } from "@/lib/qbo/executor";
-import { executeDemoTool } from "@/lib/demo/executor";
+import { executeStardexTool } from "@/lib/stardex/executor";
+import { executeApolloTool } from "@/lib/apollo/executor";
 import { logToolCall } from "@/lib/mcp/audit";
 import { validateToolArgs } from "@/lib/qbo/validation";
 import {
@@ -121,16 +122,18 @@ export async function handleToolCall(
   // Execute the tool — route to the right executor by connector type
   try {
     let result: unknown;
-    if (connectorTypeStr === "stardex") {
-      // Demo connector — runs in-process, no external API
-      result = executeDemoTool(toolName, toolArgs || {});
-    } else {
-      // QBO connector (default)
-      result = await executeQBOTool(
-        toolName,
-        toolArgs || {},
-        tool.connector_id
-      );
+    switch (connectorTypeStr) {
+      case "quickbooks":
+        result = await executeQBOTool(toolName, toolArgs || {}, tool.connector_id);
+        break;
+      case "stardex":
+        result = await executeStardexTool(toolName, toolArgs || {}, tool.connector_id);
+        break;
+      case "apollo":
+        result = await executeApolloTool(toolName, toolArgs || {}, tool.connector_id);
+        break;
+      default:
+        throw new Error(`Unknown connector type: ${connectorTypeStr}`);
     }
 
     const durationMs = Date.now() - startTime;

@@ -6,13 +6,8 @@
  *  - Providing tool schemas in MCP tools/list responses
  */
 
-export interface ToolDefinition {
-  name: string;
-  display_name: string;
-  description: string;
-  category: "read" | "write";
-  input_schema: Record<string, unknown>;
-}
+import type { ToolDefinition } from "@/types/tools";
+import { buildToolSeedData } from "@/types/tools";
 
 export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
   // ── Read Tools ──────────────────────────────────────────────────────
@@ -405,13 +400,5 @@ export const QBO_TOOL_DEFINITIONS: ToolDefinition[] = [
  * Seed tool rows for a newly connected QuickBooks connector.
  */
 export function getToolSeedData(connectorId: string) {
-  return QBO_TOOL_DEFINITIONS.map((def) => ({
-    connector_id: connectorId,
-    name: def.name,
-    display_name: def.display_name,
-    description: def.description,
-    category: def.category,
-    is_active: true,
-    input_schema: def.input_schema,
-  }));
+  return buildToolSeedData(connectorId, QBO_TOOL_DEFINITIONS);
 }

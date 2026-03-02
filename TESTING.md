@@ -13,9 +13,10 @@ This document walks through how to set up, test, and verify every component of E
 5. [Test the Admin UI](#5-test-the-admin-ui)
 6. [Test MCP OAuth Flow](#6-test-mcp-oauth-flow)
 7. [Test the MCP Server](#7-test-the-mcp-server)
-8. [Test QuickBooks Connection](#8-test-quickbooks-connection)
-9. [Test End-to-End with Claude](#9-test-end-to-end-with-claude)
-10. [Troubleshooting](#10-troubleshooting)
+8. [Test Agent API Key Auth](#8-test-agent-api-key-auth)
+9. [Test QuickBooks Connection](#9-test-quickbooks-connection)
+10. [Test End-to-End with Claude](#10-test-end-to-end-with-claude)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -74,8 +75,9 @@ npm install
 
 In the Supabase dashboard, go to **SQL Editor** and run the two migration files in order:
 
-1. `supabase/migrations/001_initial_schema.sql` — Creates all 7 tables, indexes, and triggers
+1. `supabase/migrations/001_initial_schema.sql` — Creates all 7 core tables, indexes, and triggers
 2. `supabase/migrations/002_rls_policies.sql` — Enables RLS and creates policies
+3. Any subsequent migrations (003–005) — Run in order; `005_agent_users.sql` adds agent support
 
 Alternatively, if you have the Supabase CLI:
 
@@ -87,13 +89,14 @@ supabase db push
 
 In the Supabase dashboard → **Table Editor**, confirm these tables exist:
 
-- `users`
+- `users` (includes `user_type` column: `'employee'` or `'agent'`)
 - `connectors`
 - `tools`
 - `user_tool_permissions`
 - `oauth_tokens`
 - `oauth_authorization_codes`
 - `audit_logs`
+- `agent_api_keys` (stores hashed API keys for agent users)
 
 ### 3.3 Create Your First Admin User
 
@@ -302,7 +305,7 @@ You should see token entries — the original pair should have `revoked_at` set 
 
 ## 7. Test the MCP Server
 
-Use the access token from step 6.4 (or 6.5 if you refreshed).
+Use the access token from step 6.4 (or 6.5 if you refreshed). Alternatively, use an agent API key from step 8 — both auth methods work identically.
 
 ### 7.1 Initialize
 
@@ -400,9 +403,119 @@ curl -s -X DELETE http://localhost:3000/api/mcp
 
 ---
 
-## 8. Test QuickBooks Connection
+## 8. Test Agent API Key Auth
 
-### 8.1 Set Up Intuit Developer App
+Agents are AI users (e.g. from OpenClaw) that authenticate via API keys instead of OAuth.
+
+### 8.1 Create an Agent User
+
+1. Go to **Users** → click **Add User**
+2. Select the **Agent** tab (instead of Employee)
+3. Enter a name, e.g. `Test Agent`
+4. Click **Create Agent**
+5. An API key is displayed (starts with `eak_`) — **copy it immediately**, it won't be shown again
+
+Save the key:
+
+```bash
+AGENT_KEY=eak_<paste-your-key>
+```
+
+### 8.2 Verify Agent in Database
+
+```sql
+-- Agent should appear in users with user_type = 'agent'
+SELECT id, email, name, role, user_type
+FROM public.users
+WHERE user_type = 'agent';
+
+-- Key hash should be stored (never the plaintext)
+SELECT id, user_id, key_prefix, revoked_at, created_at
+FROM public.agent_api_keys;
+```
+
+### 8.3 Grant Agent Permissions
+
+1. Go to **Permissions** page
+2. The agent appears as a column alongside employees (with an "Agent" badge)
+3. Toggle on tools the agent should access — e.g. grant all read tools
+
+### 8.4 Test Agent Auth — List Tools
+
+```bash
+curl -s -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $AGENT_KEY" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "tools/list",
+    "params": {}
+  }' | jq .
+```
+
+**Expected:** A `result.tools` array containing the tools you granted.
+
+### 8.5 Test Agent Auth — Call a Tool
+
+```bash
+curl -s -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $AGENT_KEY" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "2",
+    "method": "tools/call",
+    "params": {
+      "name": "apollo_search_people",
+      "arguments": { "person_titles": ["CEO"], "per_page": 3 }
+    }
+  }' | jq .
+```
+
+**Expected:** A `result.content` array with tool output if the agent has permission, or a `"Permission denied"` error if not.
+
+### 8.6 Test Agent Auth — Invalid Key
+
+```bash
+curl -s -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eak_invalid_key_12345" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "3",
+    "method": "tools/list",
+    "params": {}
+  }'
+```
+
+**Expected:** HTTP 401 with `WWW-Authenticate` header.
+
+### 8.7 Test Key Revocation
+
+1. Go to the agent's detail page (**Users** → **View**)
+2. Click **Regenerate Key** → confirm → copy the new key
+3. Try the old key — should return 401
+4. Try the new key — should work
+
+### 8.8 Verify Audit Logs
+
+Agent tool calls are logged the same as employee calls. Check **Audit Logs** — you should see entries with the agent's user ID.
+
+```sql
+SELECT al.action_type, al.tool_name, al.error, al.created_at, u.name
+FROM audit_logs al
+JOIN users u ON u.id = al.user_id
+WHERE u.user_type = 'agent'
+ORDER BY al.created_at DESC
+LIMIT 10;
+```
+
+---
+
+## 9. Test QuickBooks Connection
+
+### 9.1 Set Up Intuit Developer App
 
 1. Go to [developer.intuit.com](https://developer.intuit.com) → Dashboard → Create an app
 2. Select **QuickBooks Online and Payments**
@@ -411,7 +524,7 @@ curl -s -X DELETE http://localhost:3000/api/mcp
    - Add redirect URI: `http://localhost:3000/api/qbo/callback`
 4. Under **Sandbox** → note the sandbox company available for testing
 
-### 8.2 Connect QuickBooks
+### 9.2 Connect QuickBooks
 
 1. Log in to the admin UI at [http://localhost:3000/admin](http://localhost:3000/admin)
 2. Go to **Connectors**
@@ -425,7 +538,7 @@ curl -s -X DELETE http://localhost:3000/api/mcp
 - Realm ID, environment, and connection date should display
 - 12 tools should appear (8 read, 4 write) with toggle switches
 
-### 8.3 Verify in Database
+### 9.3 Verify in Database
 
 ```sql
 -- Check connector
@@ -440,7 +553,7 @@ ORDER BY category, name;
 
 You should see 12 tools (8 read + 4 write).
 
-### 8.4 Grant Permissions
+### 9.4 Grant Permissions
 
 1. Go to **Permissions** page
 2. You should now see the tool access matrix
@@ -449,7 +562,7 @@ You should see 12 tools (8 read + 4 write).
    - Grant **write** tools only to the admin
 4. Use the "+Read" bulk button for convenience
 
-### 8.5 Test Tool Execution via MCP
+### 9.5 Test Tool Execution via MCP
 
 Now that QBO is connected and permissions are granted, try calling a tool:
 
@@ -470,7 +583,7 @@ curl -s -X POST http://localhost:3000/api/mcp \
 
 **Expected:** A `result.content` array with a text element containing formatted customer data from the QBO sandbox.
 
-### 8.6 Test More Tools
+### 9.6 Test More Tools
 
 ```bash
 # Get invoices
@@ -523,7 +636,7 @@ curl -s -X POST http://localhost:3000/api/mcp \
   }' | jq .
 ```
 
-### 8.7 Verify Audit Logs
+### 9.7 Verify Audit Logs
 
 After running tool calls, go to **Audit Logs** in the admin UI. You should see entries for each tool_call with:
 - The user who made the call
@@ -533,11 +646,11 @@ After running tool calls, go to **Audit Logs** in the admin UI. You should see e
 
 ---
 
-## 9. Test End-to-End with Claude
+## 10. Test End-to-End with Claude
 
 This is the real integration test — connecting Claude Desktop (or claude.ai) to your MCP server.
 
-### 9.1 Expose Your Local Server
+### 10.1 Expose Your Local Server
 
 Claude needs to reach your server over the internet. Options:
 
@@ -555,7 +668,7 @@ ngrok http 3000
 ```
 Note the public URL — you'll need it as the MCP server URL.
 
-### 9.2 Configure Claude's MCP Connector
+### 10.2 Configure Claude's MCP Connector
 
 In Claude Desktop → Settings → MCP Servers, or in Claude.ai MCP settings:
 
@@ -563,7 +676,7 @@ In Claude Desktop → Settings → MCP Servers, or in Claude.ai MCP settings:
 2. URL: `https://your-domain.com/api/mcp` (your public URL)
 3. Client ID: `einstellen-claude-connector` (must match `MCP_CLIENT_ID`)
 
-### 9.3 Test the OAuth Handshake
+### 10.3 Test the OAuth Handshake
 
 When Claude first tries to use a tool:
 1. Claude discovers your server via the well-known endpoints
@@ -571,7 +684,7 @@ When Claude first tries to use a tool:
 3. After consent, Claude receives an access token
 4. Claude can now call tools
 
-### 9.4 Try Prompts
+### 10.4 Try Prompts
 
 Once connected, try these prompts with Claude:
 
@@ -587,7 +700,7 @@ Claude should use the MCP tools and return formatted results.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### OAuth Errors
 
@@ -615,6 +728,16 @@ Claude should use the MCP tools and return formatted results.
 | Redirected to /login from /admin | Session expired or not admin | Log in again; verify user has role = 'admin' in DB |
 | "User creation failed" | Email already exists in auth.users | Use a different email |
 | Permission matrix empty | No tools seeded | Connect QuickBooks first |
+
+### Agent API Key Errors
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| 401 with `eak_` key | Key revoked or invalid | Check `agent_api_keys` table for `revoked_at`; regenerate if needed |
+| Agent not in permission matrix | `user_type` not set to `'agent'` | Verify user row: `SELECT user_type FROM users WHERE id = '<id>'` |
+| "Permission denied" on tool call | Agent not granted access | Grant tools on the Permissions page |
+| Agent can't be created | Migration not run | Run `005_agent_users.sql` |
+| Key display shows nothing | `createAgent` action error | Check server logs; verify `agent_api_keys` table exists |
 
 ### Database Errors
 
@@ -660,4 +783,18 @@ LIMIT 20;
 -- Check connector health
 SELECT type, status, config->>'realm_id' as realm_id, connected_at
 FROM connectors;
+
+-- List all agent users and their API keys
+SELECT u.id, u.name, u.user_type, ak.key_prefix, ak.revoked_at, ak.created_at
+FROM users u
+LEFT JOIN agent_api_keys ak ON ak.user_id = u.id
+WHERE u.user_type = 'agent'
+ORDER BY u.created_at DESC;
+
+-- Check an agent's permissions
+SELECT t.name, t.category, utp.granted_at
+FROM user_tool_permissions utp
+JOIN tools t ON t.id = utp.tool_id
+JOIN users u ON u.id = utp.user_id
+WHERE u.user_type = 'agent' AND u.id = '<agent-user-id>';
 ```

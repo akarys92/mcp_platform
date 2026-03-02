@@ -13,6 +13,31 @@ export default function SetupGuidePage() {
   const mcpClientId = process.env.MCP_CLIENT_ID || "einstellen-claude-connector";
   const mcpUrl = `${appUrl}/api/mcp`;
 
+  const agentCurlExample = `curl -X POST ${mcpUrl} \\
+  -H "Authorization: Bearer eak_YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`;
+
+  const agentPythonExample = `import httpx
+
+response = httpx.post(
+    "${mcpUrl}",
+    headers={
+        "Authorization": "Bearer eak_YOUR_API_KEY",
+        "Content-Type": "application/json",
+    },
+    json={
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "apollo_search_people",
+            "arguments": {"person_titles": ["CEO"]},
+        },
+    },
+)
+print(response.json())`;
+
   const employeeMessage = `Hi! We've set up Einstellen Connect so you can use Claude to work with our business tools.
 
 Here's how to connect:
@@ -129,6 +154,75 @@ If you have any issues, reach out to your admin.`;
 
       <Separator />
 
+      {/* Agent setup */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Agent Setup — API Key Authentication</CardTitle>
+          <CardDescription>
+            Connect AI agents (e.g. OpenClaw) to the MCP endpoint using API keys
+            instead of OAuth.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3 text-sm">
+            <div>
+              <h3 className="font-medium">Step 1: Create an Agent User</h3>
+              <p className="mt-1 text-muted-foreground">
+                Go to the Users page and click &quot;Add User&quot;. Select the
+                &quot;Agent&quot; type, give it a name, and click &quot;Create
+                Agent&quot;. An API key will be generated — copy it immediately,
+                as it won&apos;t be shown again.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-medium">Step 2: Grant Permissions</h3>
+              <p className="mt-1 text-muted-foreground">
+                Go to the Permissions page. The agent appears alongside
+                employees in the access matrix. Toggle on the tools the agent
+                should be able to use.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-medium">Step 3: Authenticate Requests</h3>
+              <p className="mt-1 text-muted-foreground">
+                Send the API key as a Bearer token in the Authorization header.
+                The endpoint, protocol, and tool schemas are identical to the
+                OAuth flow — only the auth method differs.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                Example — List available tools
+              </p>
+              <CopyBlock text={agentCurlExample} multiline />
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                Example — Call a tool (Python)
+              </p>
+              <CopyBlock text={agentPythonExample} multiline />
+            </div>
+
+            <div>
+              <h3 className="font-medium">Key Management</h3>
+              <p className="mt-1 text-muted-foreground">
+                API keys don&apos;t expire automatically. To rotate a key, open
+                the agent&apos;s detail page (Users → View) and click
+                &quot;Regenerate Key&quot;. The old key is revoked immediately.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
       {/* Technical reference */}
       <Card>
         <CardHeader>
@@ -138,44 +232,87 @@ If you have any issues, reach out to your admin.`;
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3 text-sm">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-muted-foreground">MCP Server URL</p>
-                <CopyBlock text={mcpUrl} />
+          <div className="space-y-4 text-sm">
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                Shared
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    MCP Server URL
+                  </p>
+                  <CopyBlock text={mcpUrl} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Protocol</p>
+                  <CopyBlock text="JSON-RPC 2.0 over HTTP" />
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Client ID</p>
-                <CopyBlock text={mcpClientId} />
+            </div>
+
+            <Separator />
+
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                OAuth (Claude Desktop &amp; claude.ai)
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Client ID</p>
+                  <CopyBlock text={mcpClientId} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Authorization Endpoint
+                  </p>
+                  <CopyBlock text={`${appUrl}/oauth/authorize`} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Token Endpoint
+                  </p>
+                  <CopyBlock text={`${appUrl}/api/oauth/token`} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Server Metadata
+                  </p>
+                  <CopyBlock
+                    text={`${appUrl}/.well-known/oauth-authorization-server`}
+                  />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Resource Metadata
+                  </p>
+                  <CopyBlock
+                    text={`${appUrl}/.well-known/oauth-protected-resource`}
+                  />
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  OAuth Authorization Endpoint
-                </p>
-                <CopyBlock text={`${appUrl}/oauth/authorize`} />
+            </div>
+
+            <Separator />
+
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                API Key (Agents)
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Auth Header</p>
+                  <CopyBlock text="Authorization: Bearer eak_..." />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Key Prefix</p>
+                  <CopyBlock text="eak_" />
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  OAuth Token Endpoint
-                </p>
-                <CopyBlock text={`${appUrl}/api/oauth/token`} />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Server Metadata
-                </p>
-                <CopyBlock
-                  text={`${appUrl}/.well-known/oauth-authorization-server`}
-                />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Resource Metadata
-                </p>
-                <CopyBlock
-                  text={`${appUrl}/.well-known/oauth-protected-resource`}
-                />
-              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Agent API keys never expire. Revoke or regenerate from the
+                agent&apos;s user detail page.
+              </p>
             </div>
           </div>
         </CardContent>
