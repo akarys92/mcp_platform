@@ -79,7 +79,11 @@ export const STARDEX_TOOL_DEFINITIONS: ToolDefinition[] = [
     name: "stardex_search_persons",
     display_name: "Search Persons",
     description:
-      "Search people in the Stardex database by name, email, phone, LinkedIn URL, or vector search query.",
+      "Search people in the Stardex database by name, email, phone, LinkedIn URL, or semantic vector search.\n\n" +
+      "For exact-match searches (name, email, phone, linkedin_url), results are returned immediately.\n\n" +
+      "For semantic/vector searches (vector_search parameter), the search runs asynchronously because it can take 30-120 seconds. " +
+      "The tool returns a job_id instead of results. You MUST then call stardex_get_search_results with that job_id to retrieve results. " +
+      "Wait at least 15 seconds before the first poll, then poll every 15-30 seconds until results are ready.",
     category: "read",
     input_schema: {
       type: "object",
@@ -107,7 +111,7 @@ export const STARDEX_TOOL_DEFINITIONS: ToolDefinition[] = [
         vector_search: {
           type: "string",
           description:
-            "Semantic search query, min 5 chars (e.g. 'VP ops with strategy consulting experience')",
+            "Semantic search query, min 5 chars (e.g. 'VP ops with strategy consulting experience'). Triggers an async search that returns a job_id.",
         },
         offset: {
           type: "number",
@@ -118,6 +122,27 @@ export const STARDEX_TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Maximum records to return, 1-100 (default: 100)",
         },
       },
+    },
+  },
+
+  {
+    name: "stardex_get_search_results",
+    display_name: "Get Search Results",
+    description:
+      "Retrieve results from an asynchronous vector search started by stardex_search_persons. " +
+      "Pass the job_id that was returned by the search tool. " +
+      "Returns the search results when ready, or a status update if still processing. " +
+      "If status is 'running' or 'pending', wait 15-30 seconds and try again.",
+    category: "read",
+    input_schema: {
+      type: "object",
+      properties: {
+        job_id: {
+          type: "string",
+          description: "The job ID returned by stardex_search_persons",
+        },
+      },
+      required: ["job_id"],
     },
   },
 

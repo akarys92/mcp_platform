@@ -127,7 +127,7 @@ export async function handleToolCall(
         result = await executeQBOTool(toolName, toolArgs || {}, tool.connector_id);
         break;
       case "stardex":
-        result = await executeStardexTool(toolName, toolArgs || {}, tool.connector_id);
+        result = await executeStardexTool(toolName, toolArgs || {}, tool.connector_id, userId);
         break;
       case "apollo":
         result = await executeApolloTool(toolName, toolArgs || {}, tool.connector_id);
