@@ -1,7 +1,7 @@
 {
   "functions": {
     "src/app/api/mcp/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 150
     },
     "src/app/api/qbo/callback/route.ts": {
       "maxDuration": 15

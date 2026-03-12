@@ -1,5 +1,7 @@
 import { StardexClient } from "../client";
 
+const VECTOR_SEARCH_TIMEOUT_MS = 120_000;
+
 export async function listJobs(
   client: StardexClient,
   args: Record<string, unknown>
@@ -44,7 +46,8 @@ export async function searchPersons(
   }
   if (args.offset != null) params.offset = String(args.offset);
   if (args.limit) params.limit = String(args.limit);
-  return client.get("/v1/persons", params);
+  const isVectorSearch = Boolean(params.vector_search);
+  return client.get("/v1/persons", params, isVectorSearch ? { timeoutMs: VECTOR_SEARCH_TIMEOUT_MS } : undefined);
 }
 
 export async function getPerson(

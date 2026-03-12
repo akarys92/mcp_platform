@@ -71,8 +71,10 @@ export abstract class ApiKeyClient {
    */
   async get(
     path: string,
-    params?: Record<string, string>
+    params?: Record<string, string>,
+    options?: { timeoutMs?: number }
   ): Promise<unknown> {
+    const timeoutMs = options?.timeoutMs ?? REQUEST_TIMEOUT_MS;
     let url = `${this.baseUrl}${path}`;
     if (params) {
       const filtered = Object.fromEntries(
@@ -90,12 +92,12 @@ export abstract class ApiKeyClient {
           ...this.buildAuthHeaders(),
           Accept: "application/json",
         },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
       if (err instanceof DOMException && err.name === "TimeoutError") {
         throw new Error(
-          `${this.constructor.name} request timed out after ${REQUEST_TIMEOUT_MS / 1000}s: GET ${path}`
+          `${this.constructor.name} request timed out after ${timeoutMs / 1000}s: GET ${path}`
         );
       }
       throw err;
