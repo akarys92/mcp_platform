@@ -21,6 +21,8 @@ export class ApiClientError extends Error {
  * Base class for API-key-authenticated connector clients.
  * Subclasses set baseUrl and buildAuthHeaders().
  */
+const REQUEST_TIMEOUT_MS = 45_000;
+
 export abstract class ApiKeyClient {
   protected apiKey: string;
   protected connectorId: string;
@@ -69,8 +71,10 @@ export abstract class ApiKeyClient {
    */
   async get(
     path: string,
-    params?: Record<string, string>
+    params?: Record<string, string>,
+    options?: { timeoutMs?: number }
   ): Promise<unknown> {
+    const timeoutMs = options?.timeoutMs ?? REQUEST_TIMEOUT_MS;
     let url = `${this.baseUrl}${path}`;
     if (params) {
       const filtered = Object.fromEntries(
@@ -88,12 +92,12 @@ export abstract class ApiKeyClient {
           ...this.buildAuthHeaders(),
           Accept: "application/json",
         },
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
       if (err instanceof DOMException && err.name === "TimeoutError") {
         throw new Error(
-          `${this.constructor.name} request timed out after 30s: GET ${path}`
+          `${this.constructor.name} request timed out after ${timeoutMs / 1000}s: GET ${path}`
         );
       }
       throw err;
@@ -131,12 +135,12 @@ export abstract class ApiKeyClient {
           "Content-Type": "application/json",
         },
         body: options.body ? JSON.stringify(options.body) : undefined,
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (err) {
       if (err instanceof DOMException && err.name === "TimeoutError") {
         throw new Error(
-          `${this.constructor.name} request timed out after 30s: ${method} ${path}`
+          `${this.constructor.name} request timed out after ${REQUEST_TIMEOUT_MS / 1000}s: ${method} ${path}`
         );
       }
       throw err;

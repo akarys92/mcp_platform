@@ -1,4 +1,10 @@
 import { StardexClient } from "../client";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+export interface ToolContext {
+  userId: string;
+  connectorId: string;
+}
 
 export async function listJobs(
   client: StardexClient,
@@ -30,7 +36,8 @@ export async function listJobCandidates(
 
 export async function searchPersons(
   client: StardexClient,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  context?: ToolContext
 ): Promise<unknown> {
   const params: Record<string, string> = {};
   if (args.name) params.name = String(args.name);
@@ -44,7 +51,109 @@ export async function searchPersons(
   }
   if (args.offset != null) params.offset = String(args.offset);
   if (args.limit) params.limit = String(args.limit);
-  return client.get("/v1/persons", params);
+
+  // Non-vector searches: synchronous fast path
+  if (!params.vector_search) {
+    return client.get("/v1/persons", params);
+  }
+
+  // Vector search: async job pattern
+  if (!context) {
+    throw new Error("Vector search requires user context");
+  }
+
+  const supabase = createAdminClient();
+  const { data: job, error } = await supabase
+    .from("search_jobs")
+    .insert({
+      user_id: context.userId,
+      connector_id: context.connectorId,
+      query_params: params,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+
+  if (error || !job) {
+    throw new Error("Failed to create search job");
+  }
+
+  // Fire the worker (don't await the result body)
+  const workerUrl = buildWorkerUrl();
+  fetch(workerUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_id: job.id }),
+  }).catch((err) => {
+    console.error("[search-worker] Failed to dispatch:", err);
+  });
+
+  return {
+    job_id: job.id,
+    status: "pending",
+    message:
+      "Vector search started. Use stardex_get_search_results with this job_id to check for results.",
+  };
+}
+
+export async function getSearchResults(
+  _client: StardexClient,
+  args: Record<string, unknown>,
+  context?: ToolContext
+): Promise<unknown> {
+  if (!args.job_id) {
+    throw new Error("job_id is required");
+  }
+  if (!context?.userId) {
+    throw new Error("User context required");
+  }
+
+  const supabase = createAdminClient();
+  const { data: job, error } = await supabase
+    .from("search_jobs")
+    .select("id, status, result, error, started_at, completed_at")
+    .eq("id", String(args.job_id))
+    .eq("user_id", context.userId)
+    .single();
+
+  if (error || !job) {
+    return { error: "Job not found or access denied", job_id: args.job_id };
+  }
+
+  switch (job.status) {
+    case "completed":
+      return job.result;
+    case "failed":
+      return { status: "failed", error: job.error, job_id: job.id };
+    case "running": {
+      const elapsed = job.started_at
+        ? Math.round(
+            (Date.now() - new Date(job.started_at).getTime()) / 1000
+          )
+        : 0;
+      return {
+        status: "running",
+        job_id: job.id,
+        elapsed_seconds: elapsed,
+        message: "Search is still running. Please try again in 15-30 seconds.",
+      };
+    }
+    default:
+      return {
+        status: "pending",
+        job_id: job.id,
+        message:
+          "Search has not started yet. Please try again in a few seconds.",
+      };
+  }
+}
+
+function buildWorkerUrl(): string {
+  const vercelUrl = process.env.VERCEL_URL;
+  if (vercelUrl) {
+    return `https://${vercelUrl}/api/workers/stardex-search`;
+  }
+  return "http://localhost:3000/api/workers/stardex-search";
 }
 
 export async function getPerson(

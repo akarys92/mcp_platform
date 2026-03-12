@@ -1,10 +1,12 @@
 import { StardexClient } from "./client";
 import * as readTools from "./tools/read";
 import * as writeTools from "./tools/write";
+import type { ToolContext } from "./tools/read";
 
 type ToolHandler = (
   client: StardexClient,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  context?: ToolContext
 ) => Promise<unknown>;
 
 const TOOL_MAP: Record<string, ToolHandler> = {
@@ -14,6 +16,7 @@ const TOOL_MAP: Record<string, ToolHandler> = {
   stardex_list_job_candidates: readTools.listJobCandidates,
   // Persons
   stardex_search_persons: readTools.searchPersons,
+  stardex_get_search_results: readTools.getSearchResults,
   stardex_get_person: readTools.getPerson,
   stardex_create_person: writeTools.createPerson,
   stardex_update_person: writeTools.updatePerson,
@@ -34,7 +37,8 @@ const TOOL_MAP: Record<string, ToolHandler> = {
 export async function executeStardexTool(
   toolName: string,
   args: Record<string, unknown>,
-  connectorId: string
+  connectorId: string,
+  userId?: string
 ): Promise<unknown> {
   const handler = TOOL_MAP[toolName];
   if (!handler) {
@@ -42,5 +46,6 @@ export async function executeStardexTool(
   }
 
   const client = await StardexClient.fromConnector(connectorId);
-  return handler(client, args);
+  const context = userId ? { userId, connectorId } : undefined;
+  return handler(client, args, context);
 }
