@@ -78,15 +78,26 @@ export async function searchPersons(
     throw new Error("Failed to create search job");
   }
 
-  // Fire the worker (don't await the result body)
+  // Dispatch the worker and await the response headers to ensure
+  // the request lands before this serverless function exits.
+  // The worker returns 200 immediately and processes in background via after().
   const workerUrl = buildWorkerUrl();
-  fetch(workerUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job_id: job.id }),
-  }).catch((err) => {
+  try {
+    const resp = await fetch(workerUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: job.id }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(
+        `[search-worker] Dispatch failed: ${resp.status} ${body}`
+      );
+    }
+  } catch (err) {
     console.error("[search-worker] Failed to dispatch:", err);
-  });
+  }
 
   return {
     job_id: job.id,
@@ -95,6 +106,10 @@ export async function searchPersons(
       "Vector search started. Use stardex_get_search_results with this job_id to check for results.",
   };
 }
+
+// Max age before a pending/running job is considered timed out
+const PENDING_TIMEOUT_S = 60;
+const RUNNING_TIMEOUT_S = 300;
 
 export async function getSearchResults(
   _client: StardexClient,
@@ -111,13 +126,41 @@ export async function getSearchResults(
   const supabase = createAdminClient();
   const { data: job, error } = await supabase
     .from("search_jobs")
-    .select("id, status, result, error, started_at, completed_at")
+    .select("id, status, result, error, created_at, started_at, completed_at")
     .eq("id", String(args.job_id))
     .eq("user_id", context.userId)
     .single();
 
   if (error || !job) {
     return { error: "Job not found or access denied", job_id: args.job_id };
+  }
+
+  // Detect timed-out jobs and mark them as failed
+  if (job.status === "pending" || job.status === "running") {
+    const refTime = job.status === "running" ? job.started_at : job.created_at;
+    const timeoutS =
+      job.status === "running" ? RUNNING_TIMEOUT_S : PENDING_TIMEOUT_S;
+
+    if (refTime) {
+      const elapsed = (Date.now() - new Date(refTime).getTime()) / 1000;
+      if (elapsed > timeoutS) {
+        const timeoutMsg =
+          job.status === "running"
+            ? "Search timed out after 5 minutes"
+            : "Search failed to start — worker did not pick up the job";
+
+        await supabase
+          .from("search_jobs")
+          .update({
+            status: "failed",
+            error: timeoutMsg,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", job.id);
+
+        return { status: "failed", error: timeoutMsg, job_id: job.id };
+      }
+    }
   }
 
   switch (job.status) {
