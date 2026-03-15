@@ -1,9 +1,6 @@
 {
   "functions": {
     "src/app/api/mcp/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/workers/stardex-search/route.ts": {
       "maxDuration": 300
     },
     "src/app/api/qbo/callback/route.ts": {
