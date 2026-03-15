@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { StardexClient } from "../client";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -78,50 +79,49 @@ export async function searchPersons(
     throw new Error("Failed to create search job");
   }
 
-  // Dispatch the worker and await the response headers to ensure
-  // the request lands before this serverless function exits.
-  // The worker returns 200 immediately and processes in background via after().
-  const workerUrl = buildWorkerUrl();
-  let dispatchError: string | null = null;
-  try {
-    const resp = await fetch(workerUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ job_id: job.id }),
-    });
+  // Mark as running and execute the search in background via after().
+  // We use after() instead of an HTTP self-call to avoid Vercel
+  // deployment protection blocking internal requests.
+  await supabase
+    .from("search_jobs")
+    .update({ status: "running", started_at: new Date().toISOString() })
+    .eq("id", job.id);
 
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => "");
-      dispatchError = `Worker responded ${resp.status}: ${body}`;
-      console.error(`[search-worker] Dispatch failed: ${dispatchError}`);
+  after(async () => {
+    const bgSupabase = createAdminClient();
+    try {
+      const bgClient = await StardexClient.fromConnector(context.connectorId);
+      const result = await bgClient.get("/v1/persons", params, {
+        timeoutMs: 240_000,
+      });
+
+      await bgSupabase
+        .from("search_jobs")
+        .update({
+          status: "completed",
+          result,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", job.id);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Unknown error";
+      console.error(`[search] Job ${job.id} failed:`, errorMessage);
+
+      await bgSupabase
+        .from("search_jobs")
+        .update({
+          status: "failed",
+          error: errorMessage,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", job.id);
     }
-  } catch (err) {
-    dispatchError = err instanceof Error ? err.message : String(err);
-    console.error("[search-worker] Failed to dispatch:", dispatchError);
-  }
-
-  if (dispatchError) {
-    // Mark the job as failed immediately so the caller doesn't wait
-    await supabase
-      .from("search_jobs")
-      .update({
-        status: "failed",
-        error: `Dispatch failed: ${dispatchError}`,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", job.id);
-
-    return {
-      job_id: job.id,
-      status: "failed",
-      error: `Worker dispatch failed: ${dispatchError}`,
-      debug: { workerUrl },
-    };
-  }
+  });
 
   return {
     job_id: job.id,
-    status: "pending",
+    status: "running",
     message:
       "Vector search started. Use stardex_get_search_results with this job_id to check for results.",
   };
@@ -209,14 +209,6 @@ export async function getSearchResults(
           "Search has not started yet. Please try again in a few seconds.",
       };
   }
-}
-
-function buildWorkerUrl(): string {
-  const vercelUrl = process.env.VERCEL_URL;
-  if (vercelUrl) {
-    return `https://${vercelUrl}/api/workers/stardex-search`;
-  }
-  return "http://localhost:3000/api/workers/stardex-search";
 }
 
 export async function getPerson(

@@ -16,6 +16,6 @@ export const config = {
      * - api/mcp (MCP server uses its own Bearer auth)
      * - api/oauth (OAuth endpoints use their own auth)
      */
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|\\.well-known|api/mcp|api/oauth|api/workers).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|\\.well-known|api/mcp|api/oauth).*)",
   ],
 };
