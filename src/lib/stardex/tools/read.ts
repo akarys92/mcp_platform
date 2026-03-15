@@ -82,6 +82,7 @@ export async function searchPersons(
   // the request lands before this serverless function exits.
   // The worker returns 200 immediately and processes in background via after().
   const workerUrl = buildWorkerUrl();
+  let dispatchError: string | null = null;
   try {
     const resp = await fetch(workerUrl, {
       method: "POST",
@@ -91,12 +92,31 @@ export async function searchPersons(
 
     if (!resp.ok) {
       const body = await resp.text().catch(() => "");
-      console.error(
-        `[search-worker] Dispatch failed: ${resp.status} ${body}`
-      );
+      dispatchError = `Worker responded ${resp.status}: ${body}`;
+      console.error(`[search-worker] Dispatch failed: ${dispatchError}`);
     }
   } catch (err) {
-    console.error("[search-worker] Failed to dispatch:", err);
+    dispatchError = err instanceof Error ? err.message : String(err);
+    console.error("[search-worker] Failed to dispatch:", dispatchError);
+  }
+
+  if (dispatchError) {
+    // Mark the job as failed immediately so the caller doesn't wait
+    await supabase
+      .from("search_jobs")
+      .update({
+        status: "failed",
+        error: `Dispatch failed: ${dispatchError}`,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+
+    return {
+      job_id: job.id,
+      status: "failed",
+      error: `Worker dispatch failed: ${dispatchError}`,
+      debug: { workerUrl },
+    };
   }
 
   return {
